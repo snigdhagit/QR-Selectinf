@@ -20,3 +20,10 @@ def find_root(x, tau, bw, kernel):
         return kernel_pdf(-x / bw + norm.ppf(tau) / bw + u, kernel) * norm.cdf(- bw * u)
     integral = integrate.quad(f, -np.inf, np.inf)
     return integral[0] - tau
+
+def find_root_scale(x, scale, tau, bw, kernel):
+    def f(u):
+        return kernel_pdf(-x / bw + norm.ppf(tau) * scale / bw +  u * scale, kernel) * \
+            norm.cdf(- bw * u)
+    integral = integrate.quad(f, -np.inf, np.inf)
+    return integral[0] - tau

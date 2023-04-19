@@ -41,7 +41,7 @@ class low_dim():
         self.opt.update(solve_args)
 
     def bandwidth(self, tau):
-        h0 = 2 * min((self.X.shape[1] + np.log(self.n)) / self.n, 0.5) ** 0.4
+        h0 = 2.5 * min((self.X.shape[1] + np.log(self.n)) / self.n, 0.5) ** 0.4
         return max(0.01, h0 * (tau - tau ** 2) ** 0.5)
 
     def kernel_pdf(self, x, kernel='Laplacian'):
