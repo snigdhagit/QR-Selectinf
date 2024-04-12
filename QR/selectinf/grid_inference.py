@@ -2,7 +2,8 @@ from typing import NamedTuple
 import numpy as np, pandas as pd
 
 from .selective_MLE import mle_inference
-from ..base import target_query_Interactspec
+from .base import target_query_Interactspec
+from .Utils.barrier_affine import solve_barrier_affine_py
 
 
 class ConditionalSpec(NamedTuple):

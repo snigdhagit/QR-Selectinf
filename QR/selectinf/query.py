@@ -5,28 +5,23 @@ from .approx_reference import approximate_grid_inference
 from .exact_reference import exact_grid_inference
 
 class QuerySpec(NamedTuple):
-    # law of o|S,u
-
+    # the mean and covariance of o|S,u
     cond_mean: np.ndarray
     cond_cov: np.ndarray
 
     # how S enters into E[o|S,u]
-
     opt_linear: np.ndarray
 
     # constraints
-
     linear_part: np.ndarray
     offset: np.ndarray
 
     # score / randomization relationship
-
     M1: np.ndarray
     M2: np.ndarray
     M3: np.ndarray
 
     # observed values
-
     observed_opt_state: np.ndarray
     observed_score_state: np.ndarray
     observed_subgrad: np.ndarray
@@ -69,21 +64,20 @@ class gaussian_query(object):
         return QuerySpec(cond_mean=self.cond_mean,
                          cond_cov=self.cond_cov,
                          opt_linear=self.opt_linear,
-                         linear_part=self.linear_part,
+                         linear_part=self.linear_part, # linear_part o < offset
                          offset=self.offset,
                          M1=self.M1,
                          M2=self.M2,
                          M3=self.M3,
-                         observed_opt_state=self.observed_opt_state,
-                         observed_score_state=self.observed_score_state,
-                         observed_subgrad=self.observed_subgrad,
-                         observed_soln=self.observed_opt_state,
-                         observed_score=self.observed_score_state + self.observed_subgrad)
+                         observed_opt_state=self.observed_opt_state, # o
+                         observed_score_state=self.observed_score_state, # S
+                         observed_subgrad=self.observed_subgrad, # c
+                         observed_soln=self.observed_opt_state, # o
+                         observed_score=self.observed_score_state + self.observed_subgrad) # S + c
 
     # Methods reused by subclasses
 
     def randomize(self, perturb=None):
-
         """
         The actual randomization step.
         Parameters
@@ -108,16 +102,8 @@ class gaussian_query(object):
 
     sampler = property(get_sampler, set_sampler, doc='Sampler of optimization (augmented) variables.')
 
-    def fit(self, perturb=None):
-
-        # take a new perturbation if supplied
-        if perturb is not None:
-            self._initial_omega = perturb
-        if self._initial_omega is None:
-            self._initial_omega = self.randomizer.sample()
 
     # Private methods
-
     def _setup_sampler(self,
                        linear_part,
                        offset,
@@ -127,7 +113,7 @@ class gaussian_query(object):
 
         A, b = linear_part, offset
 
-        if not np.all(A.dot(self.observed_opt_state) - b <= 0):
+        if not np.all(A.dot(self.observed_opt_state[:self._active.sum()]) - b <= 0):
             raise ValueError('constraints not satisfied')
 
         (cond_mean,
@@ -140,11 +126,12 @@ class gaussian_query(object):
                                             dispersion=dispersion)
 
         self.cond_mean, self.cond_cov = cond_mean, cond_cov
-
         self.opt_linear = opt_linear
-        self.observed_subgrad = observed_subgrad
         self.linear_part = linear_part
         self.offset = offset
+        self.observed_subgrad = observed_subgrad
+        self.observed_score = self.observed_score_state + self.observed_subgrad
+
 
     def _setup_implied_gaussian(self,
                                 opt_linear,
@@ -152,6 +139,7 @@ class gaussian_query(object):
                                 dispersion=1):
 
         cov_rand, prec = self.randomizer.cov_prec
+        # omega, omega_inverse
 
         if np.asarray(prec).shape in [(), (0,)]:
             prod_score_prec_unnorm = self._unscaled_cov_score * prec
@@ -168,7 +156,6 @@ class gaussian_query(object):
             regress_opt = -cond_cov.dot(opt_linear.T).dot(prec)
 
         # regress_opt is regression coefficient of opt onto score + u...
-
         cond_mean = regress_opt.dot(self.observed_score_state + observed_subgrad)
 
         M1 = prod_score_prec_unnorm * dispersion
@@ -191,14 +178,13 @@ class gaussian_query(object):
                   method,
                   level=0.90,
                   method_args={}):
-
         """
         Parameters
         ----------
         target_spec : TargetSpec
            Information needed to specify the target.
         method : str
-           One of ['selective_MLE', 'approx', 'exact', 'posterior']
+           One of ['approx', 'exact']
         level : float
            Confidence level or posterior quantiles.
         method_args : dict
@@ -213,7 +199,7 @@ class gaussian_query(object):
 
         if method == 'exact':
             G = exact_grid_inference(query_spec,
-                                 target_spec)
+                                     target_spec)
 
             return G.summary(alternatives=target_spec.alternatives,
                              level=level)

@@ -61,8 +61,9 @@ class exact_grid_inference(grid_inference):
 
                 lower_limit = (trunc_lower - implied_mean) * np.sqrt(implied_prec)
                 upper_limit = (trunc_upper - implied_mean) * np.sqrt(implied_prec)
+                temp = ndist.cdf(upper_limit) - ndist.cdf(lower_limit)
 
-                ref_hat.append(np.log(ndist.cdf(upper_limit) - ndist.cdf(lower_limit)))
+                ref_hat.append(np.log(temp, where=temp>0))
 
             elif pos_indx.shape[0] == num_con:
 

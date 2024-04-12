@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import pandas as pd
 import numpy.random as rgt
@@ -6,7 +5,6 @@ from conquer.linear_model import low_dim, high_dim
 from selectinf.base import selected_targets
 from selectinf.QR_lasso import QR_lasso
 from selectinf.randomization import randomization
-from selectinf.approx_reference import approximate_grid_inference
 from selectinf.exact_reference import exact_grid_inference
 from selectinf.regreg_QR.QR_population import *
 
@@ -15,16 +13,6 @@ def cov_generate(std, rho):
     p = len(std)
     R = np.abs(np.subtract.outer(np.arange(p), np.arange(p)))
     return np.outer(std, std) * (rho ** R)
-
-# estimate AR covariance matrix
-def cov_estmate(X, t = 100):
-    ARrho = []
-    for s in np.random.sample(t):
-        Xr = X[int(s * n)]
-        ARrho.append(np.corrcoef(Xr[1:], Xr[:-1])[0, 1])
-    ARrho = np.mean(ARrho)
-    ARcov = ARrho ** (np.abs(np.subtract.outer(np.arange(p), np.arange(p))))
-    return ARcov
 
 def sensitivity_calculate(selected_set, nonzero_set, zero_set):
     selected = np.zeros(p)
@@ -49,30 +37,13 @@ gamma[0:5] = 0.1
 coverage_naive = []
 coverage_split = []
 coverage_exact = []
-coverage_apprx = []
-
-coverage_all_naive = []
-coverage_all_split = []
-coverage_all_exact = []
-coverage_all_apprx = []
 
 length_naive = []
 length_split = []
 length_exact = []
-length_apprx = []
 
-F1_select_naive = []
-F1_select_split = []
 F1_select_exact = []
-F1_select_apprx = []
-
-F1_infere_naive = []
-F1_infere_split = []
 F1_infere_exact = []
-F1_infere_apprx = []
-
-time_exact = []
-time_apprx = []
 
 for i in range(reps):
     print(i)
@@ -101,7 +72,6 @@ for i in range(reps):
                                                 standardize=False)
     selected_set = np.nonzero(selected_fit['beta'])[0]
     selected_size = len(selected_set)
-    print(selected_set)
 
     if selected_size != 0:
         # inference
@@ -121,21 +91,10 @@ for i in range(reps):
         # coverage
         coverage = (lci < beta_target) * (uci > beta_target)
         coverage_naive.append(np.mean(coverage))
-        coverage_all_naive.append(np.all(coverage))
 
         # length
         length = uci - lci
         length_naive.append(np.mean(length))
-
-        # F1 score base on selection
-        F1_select = sensitivity_calculate(selected_set, nonzero_set, zero_set)
-        F1_select_naive.append(F1_select)
-
-        # F1 score base on inference
-        selected_infere = np.zeros(p)
-        selected_infere[selected_set] = (lci > 0) | (uci < 0)
-        F1_infere = sensitivity_calculate(np.nonzero(selected_infere)[0], nonzero_set, zero_set)
-        F1_infere_naive.append(F1_infere)
 
     # -------------------------- splitting -------------------------
     # splitting
@@ -158,7 +117,6 @@ for i in range(reps):
                                                 standardize=False)
     selected_set = np.nonzero(selected_fit['beta'])[0]
     selected_size = len(selected_set)
-    print(selected_set)
 
     if selected_size != 0:
         # inference
@@ -178,21 +136,10 @@ for i in range(reps):
         # coverage
         coverage = (lci < beta_target) * (uci > beta_target)
         coverage_split.append(np.mean(coverage))
-        coverage_all_split.append(np.all(coverage))
 
         # length
         length = uci - lci
         length_split.append(np.mean(length))
-
-        # F1 score base on selection
-        F1_select = sensitivity_calculate(selected_set, nonzero_set, zero_set)
-        F1_select_split.append(F1_select)
-
-        # F1 score base on inference
-        selected_infere = np.zeros(p)
-        selected_infere[selected_set] = (lci > 0) | (uci < 0)
-        F1_infere = sensitivity_calculate(np.nonzero(selected_infere)[0], nonzero_set, zero_set)
-        F1_infere_split.append(F1_infere)
 
     # ------------------------- randomized -------------------------
     # selection
@@ -213,15 +160,10 @@ for i in range(reps):
 
     # nonzero set of penalized estimator
     selected_set = np.nonzero(conv.observed_soln)[0]
-    print(selected_set)
 
     if selected_size != 0:
-        # ------- exact pivot --------
         # inference
-        time1 = time.time()
         exact_grid_inf = exact_grid_inference(query_spec, target_spec)
-        time2 = time.time()
-        time_exact.append(time2 - time1)
 
         # confidence interval
         beta_target = np.linalg.pinv(X[:, selected_set]).dot(X.dot(beta))  # target
@@ -230,8 +172,6 @@ for i in range(reps):
         # coverage
         coverage = (lci < beta_target) * (uci > beta_target)
         coverage_exact.append(np.mean(coverage))
-        coverage_all_exact.append(np.all(coverage))
-        print(np.mean(coverage))
 
         # length
         length = uci - lci
@@ -247,56 +187,10 @@ for i in range(reps):
         F1_infere = sensitivity_calculate(np.nonzero(selected_infere)[0], nonzero_set, zero_set)
         F1_infere_exact.append(F1_infere)
 
-        # ------- approximate pivot --------
-        # inference
-        time3 = time.time()
-        approximate_grid_inf = approximate_grid_inference(query_spec, target_spec)
-        time4 = time.time()
-        time_apprx.append(time4 - time3)
 
-        # confidence interval
-        lci, uci = approximate_grid_inf._intervals(level=0.90)
-
-        # coverage
-        coverage = (lci < beta_target) * (uci > beta_target)
-        coverage_apprx.append(np.mean(coverage))
-        coverage_all_apprx.append(np.all(coverage))
-
-        # length
-        length = uci - lci
-        length_apprx.append(np.mean(length))
-
-        # F1 score base on selection
-        F1_select_apprx.append(F1_select)
-
-        # F1 score base on inference
-        selected_infere = np.zeros(p)
-        selected_infere[selected_set] = (lci > 0) | (uci < 0)
-        F1_infere = sensitivity_calculate(np.nonzero(selected_infere)[0], nonzero_set, zero_set)
-        F1_infere_apprx.append(F1_infere)
-
-# summary
-print(np.mean(coverage_exact))
-summary = pd.DataFrame({'navie': [np.mean(F1_select_naive), np.mean(coverage_naive), np.mean(coverage_all_naive),
-                                  np.mean(length_naive), np.mean(F1_infere_naive), np.nan],
-                        'splitting':[np.mean(F1_select_split), np.mean(coverage_split), np.mean(coverage_all_split),
-                                     np.mean(length_split), np.mean(F1_infere_split), np.nan],
-                        'exact': [np.mean(F1_select_exact), np.mean(coverage_exact), np.mean(coverage_all_exact),
-                                  np.mean(length_exact), np.mean(F1_infere_exact), np.mean(time_exact)],
-                        'approximate': [np.mean(F1_select_apprx), np.mean(coverage_apprx), np.mean(coverage_all_apprx),
-                                        np.mean(length_apprx), np.mean(F1_infere_apprx), np.mean(time_apprx)]},
-                       index=['F1 score in selection', 'Coverage rate', 'Joint coverage rate','CI length',
-                              'F1 score in inference', 'Inference time']).round(4)
-results = pd.DataFrame(np.column_stack((F1_select_naive, F1_select_split, F1_select_exact, F1_select_apprx,
-                                        coverage_naive, coverage_split, coverage_exact, coverage_apprx,
-                                        length_naive, length_split, length_exact, length_apprx,
-                                        F1_infere_naive, F1_infere_split, F1_infere_exact, F1_infere_apprx,
-                                        time_exact, time_apprx)),
-                       columns = ['F1_select_naive', 'F1_select_split', 'F1_select_exact', 'F1_select_apprx',
-                                  'coverage_naive', 'coverage_split', 'coverage_exact', 'coverage_apprx',
-                                  'length_naive', 'length_split', 'length_exact', 'length_apprx',
-                                  'F1_infere_naive', 'F1_infere_split', 'F1_infere_exact', 'F1_infere_apprx',
-                                  'time_exact', 'time_apprx'])
-summary.to_csv('summary_model2_0.csv', index=False)
-results.to_csv('results_model2_0.csv', index=False)
+# results
+results = pd.DataFrame(np.column_stack((F1_select_exact, F1_infere_exact, coverage_naive, coverage_split, coverage_exact,
+                                        length_naive, length_split, length_exact)),
+                       columns = ['F1_select_exact', 'F1_infere_exact', 'coverage_naive', 'coverage_split', 'coverage_exact',
+                                  'length_naive', 'length_split', 'length_exact'])
 
