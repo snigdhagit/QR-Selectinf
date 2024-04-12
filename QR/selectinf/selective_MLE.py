@@ -3,7 +3,7 @@ from __future__ import division, print_function
 import numpy as np, pandas as pd
 from scipy.stats import norm as ndist
 from .Utils.barrier_affine import solve_barrier_affine_py
-from ..base import target_query_Interactspec
+from .base import target_query_Interactspec
 
 
 class mle_inference(object):
@@ -41,11 +41,7 @@ class mle_inference(object):
         cond_precision = np.linalg.inv(QS.cond_cov)
         conjugate_arg = cond_precision.dot(QS.cond_mean)
 
-        if useC:
-            solver = solve_barrier_affine_C
-        else:
-            solver = solve_barrier_affine_py
-
+        solver = solve_barrier_affine_py
         val, soln, hess = solver(conjugate_arg,
                                  cond_precision,
                                  QS.observed_soln,

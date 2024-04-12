@@ -23,7 +23,7 @@ def solve_barrier_affine_py(conjugate_arg,
                                                  + 1./((con_offset-con_linear.dot(u))**2.))).dot(con_linear)
 
     current = feasible_point
-    current_value = np.inf
+    current_value = -1000 # change from np.inf -> -1000
 
     for itercount in range(nstep):
         cur_grad = grad(current)
