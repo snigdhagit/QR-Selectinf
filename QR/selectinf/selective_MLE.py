@@ -31,7 +31,7 @@ class mle_inference(object):
 
         prec_target = np.linalg.inv(TS.cov_target)
 
-        prec_target_nosel = prec_target + U2 - U3
+        prec_target_nosel = prec_target + U2 - U3 #sigma^j ?
 
         _P = -(U1.T.dot(QS.M1.dot(QS.observed_score)) + U2.dot(TS.observed_target))
 

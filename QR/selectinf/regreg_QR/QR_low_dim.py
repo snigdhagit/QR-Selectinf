@@ -128,7 +128,7 @@ class low_dim():
             res = self.Y - self.X.dot(beta0)
         else:
             raise ValueError("dimension of beta0 must match parameter dimension")
-
+        #SQR Algorithm 1 
         lr_seq, lval_seq = [], []
         grad0 = self.X.T.dot(self.conquer_weight(-res / h, tau, kernel)) / self.n
         diff_beta = -grad0
@@ -139,7 +139,7 @@ class low_dim():
         while t < self.opt['max_iter'] and max(abs(diff_beta)) > self.opt['tol']:
             grad1 = self.X.T.dot(self.conquer_weight(-res / h, tau, kernel)) / self.n
             diff_grad = grad1 - grad0
-            r0, r1 = diff_beta.dot(diff_beta), diff_grad.dot(diff_grad)
+            r0, r1 = diff_beta.dot(diff_beta), diff_grad.dot(diff_grad) 
             if r1 == 0:
                 lr = 1
             else:
@@ -162,6 +162,7 @@ class low_dim():
                 'res': res}
 
     def covariance(self, beta, tau=0.5, h=None, kernel="Laplacian"):
+        #SQR(2.11)
         if h == None: h = self.bandwidth(tau)
         res = self.Y - self.X.dot(beta)
         grad = self.X.T * (self.conquer_weight(-res / h, tau, kernel))

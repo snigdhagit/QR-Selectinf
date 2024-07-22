@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import numpy.random as rgt
-from conquer.linear_model import low_dim, high_dim
+from conquer.conquer.linear import low_dim, high_dim
 from selectinf.base import selected_targets
 from selectinf.QR_lasso import QR_lasso
 from selectinf.randomization import randomization
@@ -26,7 +26,7 @@ def sensitivity_calculate(selected_set, nonzero_set, zero_set):
 np.random.seed(2023)
 
 # model setting
-reps = 500
+reps = 10
 tau = 0.7
 n, p = 800, 201
 mu, Sig = np.zeros(p - 1), cov_generate(np.ones(p - 1), 0.5)
@@ -196,3 +196,4 @@ results = pd.DataFrame(np.column_stack((F1_select_exact, F1_infere_exact, covera
                        columns = ['F1_select_exact', 'F1_infere_exact', 'coverage_naive', 'coverage_split', 'coverage_exact',
                                   'length_naive', 'length_split', 'length_exact'])
 
+print(results)

@@ -99,7 +99,7 @@ class discrete_family(object):
         -----
         The weights are normalized to sum to 1.
         """
-        xw = np.array(sorted(zip(sufficient_stat, weights)), np.float)
+        xw = np.array(sorted(zip(sufficient_stat, weights)), float)
         self._x = xw[:, 0]
         self._w = xw[:, 1]
         self._lw = np.log(xw[:, 1])

@@ -9,11 +9,11 @@ from .grid_inference import grid_inference
 class exact_grid_inference(grid_inference):
 
     def log_reference(self,
-                      observed_target,
+                      observed_target, #\beta_j^E ?
                       cov_target,
                       linear_coef,
                       grid):
-
+    # compute the log truncated probability
         QS = self.query_spec
 
         if np.asarray(observed_target).shape in [(), (0,)]:
@@ -21,8 +21,8 @@ class exact_grid_inference(grid_inference):
 
         ref_hat = []
 
-        cond_precision = np.linalg.inv(QS.cond_cov)
-        num_opt = cond_precision.shape[0]
+        cond_precision = np.linalg.inv(QS.cond_cov) #QS.cond_cov = \Theta 
+        num_opt = cond_precision.shape[0] #|E|
         num_con = QS.linear_part.shape[0]
 
         for k in range(grid.shape[0]):
@@ -37,17 +37,17 @@ class exact_grid_inference(grid_inference):
 
             #direction for decomposing o
 
-            eta = cond_precision.dot(linear_coef).dot(cov_target)
+            eta = cond_precision.dot(linear_coef).dot(cov_target) 
 
-            implied_mean = np.asscalar(eta.T.dot(cond_mean_grid))
-            implied_cov = np.asscalar(eta.T.dot(QS.cond_cov).dot(eta))
-            implied_prec = 1./implied_cov
+            implied_mean = (eta.T.dot(cond_mean_grid)).item()  #\theta^J(b) exact-thm3.1
+            implied_cov = (eta.T.dot(QS.cond_cov).dot(eta)).item() #eta^T \Theta eta (denominator of Q^j)
+            implied_prec = 1./implied_cov 
 
-            _A = QS.cond_cov.dot(eta) * implied_prec
-            R = np.identity(num_opt) - _A.dot(eta.T)
+            _A = QS.cond_cov.dot(eta) * implied_prec #projection matrix Q^j
+            R = np.identity(num_opt) - _A.dot(eta.T) #orthgonal proj mat
 
-            A = QS.linear_part.dot(_A).reshape((-1,))
-            b = -QS.linear_part.dot(R).dot(QS.observed_soln)
+            A = QS.linear_part.dot(_A).reshape((-1,)) #L^TQ^j
+            b = -QS.linear_part.dot(R).dot(QS.observed_soln) #observed_soln is O (active solution), b is the analog of L^T Arj
 
             trunc_ = np.true_divide((QS.offset + b), A)
 
@@ -56,14 +56,14 @@ class exact_grid_inference(grid_inference):
 
             if pos_indx.shape[0]>0 and neg_indx.shape[0]>0:
 
-                trunc_lower = np.max(trunc_[neg_indx])
-                trunc_upper = np.min(trunc_[pos_indx])
+                trunc_lower = np.max(trunc_[neg_indx])  #I-
+                trunc_upper = np.min(trunc_[pos_indx]) #I+
 
                 lower_limit = (trunc_lower - implied_mean) * np.sqrt(implied_prec)
                 upper_limit = (trunc_upper - implied_mean) * np.sqrt(implied_prec)
-                temp = ndist.cdf(upper_limit) - ndist.cdf(lower_limit)
+                temp = ndist.cdf(upper_limit) - ndist.cdf(lower_limit) #TP^{[I-,I+]}(\theta^j,v^j))
 
-                ref_hat.append(np.log(temp, where=temp>0))
+                ref_hat.append(np.log(temp, where=temp>0)) #log truncated probability
 
             elif pos_indx.shape[0] == num_con:
 

@@ -55,7 +55,7 @@ class grid_inference(object):
                           target_spec,
                           solve_args=solve_args)
 
-        _, inverse_info, log_ref = G.solve_estimating_eqn()
+        _, inverse_info, log_ref = G.solve_estimating_eqn() #a function returning selective MLE,p-value, CI,FI, etc.
 
         TS = target_spec
         self.ntarget = ntarget = TS.cov_target.shape[0]

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import numpy.random as rgt
-from conquer.linear_model import low_dim, high_dim
+from conquer.conquer.linear import low_dim, high_dim
 from selectinf.base import selected_targets
 from selectinf.QR_lasso import QR_lasso
 from selectinf.randomization import randomization

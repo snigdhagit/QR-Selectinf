@@ -145,8 +145,8 @@ class gaussian_query(object):
             prod_score_prec_unnorm = self._unscaled_cov_score * prec
         else:
             prod_score_prec_unnorm = self._unscaled_cov_score.dot(prec)
-
-        if np.asarray(prec).shape in [(), (0,)]:
+        '''
+                if np.asarray(prec).shape in [(), (0,)]:
             cond_precision = opt_linear.T.dot(opt_linear) * prec
             cond_cov = np.linalg.inv(cond_precision)
             regress_opt = -cond_cov.dot(opt_linear.T) * prec
@@ -154,6 +154,16 @@ class gaussian_query(object):
             cond_precision = opt_linear.T.dot(prec.dot(opt_linear))
             cond_cov = np.linalg.inv(cond_precision)
             regress_opt = -cond_cov.dot(opt_linear.T).dot(prec)
+        '''
+
+        cond_precision = opt_linear.T.dot(opt_linear) * prec
+        cond_cov = np.linalg.inv(cond_precision)
+        regress_opt = -cond_cov.dot(opt_linear.T) * prec
+
+        #print(prec)
+        #print(np.diag(opt_linear.T.dot(opt_linear)))
+        #print(np.linalg.cond(cond_precision))
+
 
         # regress_opt is regression coefficient of opt onto score + u...
         cond_mean = regress_opt.dot(self.observed_score_state + observed_subgrad)

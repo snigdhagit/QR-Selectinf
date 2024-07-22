@@ -3,12 +3,31 @@ import numpy.random as rgt
 from scipy.stats import norm
 import warnings
 
-class high_dim():
+
+def concave_weight(x, penalty="SCAD", gamma=None):
+    if penalty == "SCAD":
+        if gamma is None:
+            gamma = 3.7
+        tmp = 1 - (abs(x) - 1) / (gamma - 1)
+        tmp = np.where(tmp <= 0, 0, tmp)
+        return np.where(tmp > 1, 1, tmp)
+    elif penalty == "MCP":
+        if gamma is None:
+            gamma = 3
+        tmp = 1 - abs(x) / gamma
+        return np.where(tmp <= 0, 0, tmp)
+    elif penalty == "CappedL1":
+        if gamma is None:
+            gamma = 3
+        return abs(x) <= gamma / 2
+
+class QR_high_dim():
     """
     Regularized Convolution Smoothed Quantile Regression via ILAMM (iterative local adaptive majorize-minimization)
     """
 
     kernels = ["Laplacian", "Gaussian", "Logistic", "Uniform", "Epanechnikov"]
+    penalties = ["L1","SCAD", "MCP"]
     opt = {'phi': 0.1, 'gamma': 1.25, 'max_iter': 1e3, 'tol': 1e-8, 'iter_warning': True, 'nsim': 200}
 
     def __init__(self, X, Y, omega, kernels=kernels, intercept=False, solve_args={}):
@@ -32,6 +51,7 @@ class high_dim():
         """
         self.n, self.p = X.shape
         self.Y = Y.reshape(self.n)
+        self.mX, self.sdX = np.mean(X, axis=0), np.std(X, axis=0)
         self.itcp = intercept
 
         if intercept:
@@ -106,8 +126,10 @@ class high_dim():
                             + (x > 5 ** 0.5)
         return (Ker(x) - tau)
 
+
+
     def smooth_check(self, x, tau=0.5, h=None, kernel='Laplacian'):
-        # loss function
+        # loss function (smoothed check loss function: SQR Remark 3.1)
         if h == None: h = self.bandwidth(tau)
         if kernel == 'Laplacian':
             loss = lambda x: np.where(x >= 0, tau * x, (tau - 1) * x) + 0.5 * h * np.exp(-abs(x) / h)
@@ -148,7 +170,7 @@ class high_dim():
         'lambda' : lambda value.
         """
 
-        if not Lambda:
+        if not Lambda.any():
             Lambda = np.sqrt(np.log(self.p) / self.n) * np.ones(self.p)
         elif np.size(Lambda) == 1:
             Lambda = Lambda * np.ones(self.p)
@@ -168,19 +190,19 @@ class high_dim():
 
         phi, r0, t = self.opt['phi'], 1, 0
         while r0 > self.opt['tol'] and t < self.opt['max_iter']:
-
-            grad0 = self.X.T.dot(self.conquer_weight(-res / h, tau, kernel) / self.n) - self.omega
+            #L = Q+<omega,beta>
+            grad0 = self.X.T.dot(self.conquer_weight(-res / h, tau, kernel) / self.n) - self.omega #gradient of Q and randomization term
             loss_eval0 = self.smooth_check(res, tau, h, kernel) - self.omega.dot(beta0)
             beta1 = beta0 - grad0 / phi
-            beta1[self.itcp:] = self.soft_thresh(beta1[self.itcp:], Lambda / phi)
+            beta1[self.itcp:] = self.soft_thresh(beta1[self.itcp:], Lambda / phi) #T_lambda(beta1)=sign(beta1)(max{0,abs(beta1)-lambda/phi}), with intercept excluded
             diff_beta = beta1 - beta0
-            r0 = diff_beta.dot(diff_beta)
+            r0 = diff_beta.dot(diff_beta) 
             res = self.Y - self.X.dot(beta1)
-            loss_proxy = loss_eval0 + diff_beta.dot(grad0) + 0.5 * phi * r0
-            loss_eval1 = self.smooth_check(res, tau, h, kernel) - self.omega.dot(beta1)
+            loss_proxy = loss_eval0 + diff_beta.dot(grad0) + 0.5 * phi * r0 #Psi - reg_term = L + <grad_L,beta-beta_0> + 0.5*phi*||beta-beta0||^2_2 (LAMM p9)
+            loss_eval1 = self.smooth_check(res, tau, h, kernel) - self.omega.dot(beta1) # F-reg_term = L 
 
             while loss_proxy < loss_eval1:
-                phi *= self.opt['gamma']
+                phi *= self.opt['gamma'] #phi = phi*gamma
                 beta1 = beta0 - grad0 / phi
                 beta1[self.itcp:] = self.soft_thresh(beta1[self.itcp:], Lambda / phi)
                 diff_beta = beta1 - beta0
@@ -203,6 +225,91 @@ class high_dim():
                 'niter': t,
                 'lambda': Lambda,
                 'bw': h}
+
+    def irw(self, tau=0.5, Lambda=None,
+            h=None, kernel="Laplacian",
+            beta0=np.array([]),
+            penalty="SCAD", gamma=3.7, nstep=3):
+        '''
+            Iteratively Reweighted L1-Penalized Conquer (irw-l1-conquer) for SCAD and MCP
+
+        Args:
+            tau : quantile level; default is 0.5.
+            Lambda : regularization parameter. This should be either a scalar, or
+                     a vector of length equal to the column dimension of X. If unspecified,
+                     it will be computed by self.self_tuning().
+            h : bandwidth/smoothing parameter;
+                default value is computed by self.bandwidth().
+            kernel : a character string representing one of the built-in smoothing kernels;
+                     default is "Laplacian".
+            beta0 : initial estimator. If unspecified, it will be set as zero.
+            res : residual vector of the initial estimaator.
+            penalty : a character string representing one of the built-in concave penalties;
+                      default is "SCAD".
+            a : the constant (>2) in the concave penalty; default is 3.7.
+            nstep : number of iterations/steps of the IRW algorithm; default is 3.
+            standardize : logical flag for x variable standardization prior to fitting the model;
+                          default is TRUE.
+            adjust : logical flag for returning coefficients on the original scale.
+            weight : an ndarray of observation weights; default is np.array([]) (empty).
+
+        Returns:
+            'beta' : an ndarray of estimated coefficients.
+            'res' : an ndarray of fitted residuals.
+            'nstep' : number of reweighted penalization steps.
+            'lambda' : lambda value.
+            'niter' : total number of iterations.
+            'nit_seq' : a sequence of numbers of iterations.
+        '''
+
+        if not Lambda.any():
+            Lambda = 0.75 * np.quantile(self.self_tuning(tau), 0.9)
+        elif np.size(Lambda) == 1:
+            Lambda = Lambda * np.ones(self.p)
+
+        if h == None: h = self.bandwidth(tau)
+        if kernel not in self.kernels:
+            raise ValueError("kernel must be either Laplacian, Gaussian, Logistic, Uniform or Epanechnikov")
+
+        if len(beta0) == 0:
+            model = self.l1(tau, Lambda, h, kernel)
+        else:
+            model = self.l1(tau, Lambda, h, kernel, beta0)
+
+        nit_seq = []
+        beta0, res = model['beta'], model['res']
+        nit_seq.append(model['niter'])
+        if penalty == 'L1': nstep = 0
+
+        lam = Lambda * np.ones(len(self.mX))
+        pos = lam > 0
+        rw_lam = np.zeros(len(self.mX))
+
+        dev, step = 1, 1
+        while dev > self.opt['tol'] and step <= nstep:
+            rw_lam[pos] = lam[pos] * \
+                          concave_weight(beta0[self.itcp:][pos] / lam[pos],
+                                         penalty, gamma)
+            model = self.l1(tau, rw_lam, h, kernel, beta0)
+            dev = max(abs(model['beta'] - beta0))
+            beta0, res = model['beta'], model['res']
+            nit_seq.append(model['niter'])
+            step += 1
+        nit_seq = np.array(nit_seq)
+        subgrad_penalty = self.omega - self.X.T.dot(self.conquer_weight(-res / h, tau, kernel)) / self.n
+
+        if self.itcp: Lambda = np.append(Lambda[0],Lambda)
+        if penalty == "SCAD":
+            I2 = np.diag(np.logical_and(np.abs(beta0) > Lambda, np.abs(beta0) <= gamma * Lambda).astype(int))
+            observed_subgrad = subgrad_penalty + 1/(gamma-1) * I2 @ beta0
+        elif penalty == "MCP":
+            I = np.diag(np.logical_and(np.abs(beta0) > 0, np.abs(beta0) <= gamma*Lambda)).astype(int)
+            observed_subgrad = subgrad_penalty + 1 / gamma * I @ beta0
+
+
+        return {'beta': beta0, 'res': res, 'observed_subgrad': observed_subgrad,'nstep': step, 'lambda': Lambda,
+                'niter': np.sum(nit_seq), 'nit_seq': nit_seq, 'bw': h}
+
 
     def covariance(self, beta, tau=0.5, h=None, kernel="Laplacian"):
         if h == None: h = self.bandwidth(tau)
