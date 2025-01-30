@@ -100,7 +100,8 @@ class QR_lasso(gaussian_query):
         # solving unpenalized problem (E \cup U)
         _unpenalized_problem = low_dim(self.X[:, self._overall],
                                        self.Y,
-                                       intercept=False)
+                                       intercept=False,
+                                       dimension=p)
         _unpenalized_problem_fit = _unpenalized_problem.fit(tau=self.tau,
                                                             kernel=self.kernel,
                                                             beta0=self.observed_soln[self._overall])

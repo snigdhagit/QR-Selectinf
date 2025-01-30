@@ -29,6 +29,7 @@ def selected_targets(X,
     _unpenalized_problem = low_dim(X[:, features],
                                    Y,
                                    intercept=False,
+                                   dimension=p,
                                    solve_args=solve_args)
     _unpenalized_problem_fit = _unpenalized_problem.fit(tau=tau,
                                                         kernel=kernel,
