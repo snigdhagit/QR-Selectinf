@@ -154,6 +154,7 @@ class high_dim():
             Lambda = Lambda * np.ones(self.p)
 
         if h == None: h = self.bandwidth(tau)
+        print(f"the selection bandwidth is {h}")
         if kernel not in self.kernels:
             raise ValueError("kernel must be either Laplacian, Gaussian, Logistic, Uniform or Epanechnikov")
 

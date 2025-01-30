@@ -11,7 +11,7 @@ class low_dim():
     kernels = ["Laplacian", "Gaussian", "Logistic", "Uniform", "Epanechnikov"]
     opt = {'max_iter': 1e3, 'max_lr': 10, 'tol': 1e-5, 'nboot': 200}
 
-    def __init__(self, X, Y, kernels=kernels, intercept=False, solve_args={}):
+    def __init__(self, X, Y, kernels=kernels, intercept=False, dimension=None, solve_args={}):
         """
         Parameters
         ----------
@@ -27,6 +27,7 @@ class low_dim():
             nboot : number of bootstrap samples for inference.
         """
         self.n, self.p = X.shape
+        self.dimension = dimension
         if X.shape[1] >= self.n: raise ValueError("covariate dimension exceeds sample size")
 
         self.Y = Y.reshape(self.n)
@@ -45,7 +46,8 @@ class low_dim():
     #     return max(0.01, h0 * (tau - tau ** 2) ** 0.5)
 
     def bandwidth(self, tau):
-        return ((self.p + np.log(self.n)) / self.n) ** 0.4
+        # return ((self.p + np.log(self.n)) / self.n) ** 0.4
+        return max(0.05, np.sqrt(tau * (1 - tau)) * (np.log(self.dimension) / self.n) ** 0.25)
 
     def kernel_pdf(self, x, kernel='Laplacian'):
         # pdf of kernel
@@ -119,6 +121,7 @@ class low_dim():
         'lval_seq' : a sequence of (smoothed check) loss values at the iterations.
         """
         if h == None: h = self.bandwidth(tau)
+        print(f"the inference bandwidth is {h}")
         if kernel not in self.kernels:
             raise ValueError("kernel must be either Laplacian, Gaussian, Logistic, Uniform or Epanechnikov")
         if len(beta0) == 0:
